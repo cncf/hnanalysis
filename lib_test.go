@@ -2,32 +2,31 @@ package hnanalysis
 
 import (
 	"testing"
+	"time"
 
 	lib "hnanalysis"
 	testlib "hnanalysis/test"
 )
 
-func TestDummy(t *testing.T) {
-
+func TestMonthStart(t *testing.T) {
 	// Test cases
+	ft := testlib.YMDHMS
 	var testCases = []struct {
-		name     string
-		expected string
+		time     time.Time
+		expected time.Time
 	}{
-		{
-			"Dummy test",
-			"bool:true",
-		},
+		{time: ft(2017, 8, 26, 12, 29, 3), expected: ft(2017, 8, 1)},
+		{time: ft(2017), expected: ft(2017)},
+		{time: ft(2017, 12, 10), expected: ft(2017, 12)},
 	}
-
 	// Execute test cases
 	for index, test := range testCases {
-		res := lib.Dummy()
-		got := testlib.Desc(res)
-		if got != test.expected {
+		expected := test.expected
+		got := lib.MonthStart(test.time)
+		if got != expected {
 			t.Errorf(
-				"Test case number %d \"%s\"\nExpected:\n%+v\nGot:\n%+v\n",
-				index+1, test.name, test.expected, got,
+				"test number %d, expected %v, got %v",
+				index+1, expected, got,
 			)
 		}
 	}

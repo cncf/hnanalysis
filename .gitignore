@@ -15,3 +15,6 @@
 
 # Binaries
 /hnanalysis
+
+# VIM temps
+*.swp
