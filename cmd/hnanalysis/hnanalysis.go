@@ -5,11 +5,22 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"regexp"
 	"strconv"
 	"time"
 
 	lib "hnanalysis"
 )
+
+type reData struct {
+	re  *regexp.Regexp
+	str string
+}
+
+type hnData struct {
+	nHN  int
+	hits map[reData]int
+}
 
 func processCSV(fn string) error {
 	file, err := os.Open(fn)
@@ -20,11 +31,15 @@ func processCSV(fn string) error {
 	reader := csv.NewReader(file)
 	//reader.Comma = ';'
 	row := 0
-	idIndex := -1
-	parentIndex := -1
 	timeIndex := -1
-	titleIndex := -1
 	textIndex := -1
+	data := make(map[time.Time]hnData)
+	var rexps []reData
+	rexps = append(rexps, reData{str: "Kubernetes", re: regexp.MustCompile(`(?im)(kubernetes|k8s)`)})
+	rexps = append(rexps, reData{str: "Mesos", re: regexp.MustCompile(`(?im)mesos`)})
+	rexps = append(rexps, reData{str: "Cloud Foundry", re: regexp.MustCompile(`(?im)cloud\s+foundry`)})
+	rexps = append(rexps, reData{str: "Docker Swarm", re: regexp.MustCompile(`(?im)docker\s+swarm`)})
+	rexps = append(rexps, reData{str: "OpenStack", re: regexp.MustCompile(`(?im)openstack`)})
 	for {
 		record, err := reader.Read()
 		if err == io.EOF {
@@ -33,37 +48,50 @@ func processCSV(fn string) error {
 			return err
 		}
 		row++
-		//fmt.Printf("Record %d is '%v' and has %d fields: ", row+1, record, len(record))
 		if row == 1 {
 			for k, v := range record {
 				switch v {
-				case "id":
-					idIndex = k
-				case "parent":
-					parentIndex = k
 				case "time":
 					timeIndex = k
-				case "title":
-					titleIndex = k
 				case "text":
 					textIndex = k
 				}
 			}
-			fmt.Printf("Data indices: %d,%d,%d,%d,%d\n", idIndex, parentIndex, timeIndex, titleIndex, textIndex)
 			continue
-		}
-		id := record[parentIndex]
-		if id == "" {
-			id = record[idIndex]
 		}
 		utm, err := strconv.ParseInt(record[timeIndex], 10, 64)
 		if err != nil {
 			return err
 		}
 		tm := lib.MonthStart(time.Unix(utm, 0))
-		fmt.Printf("%v\n", tm)
+		text := record[textIndex]
+		d, ok := data[tm]
+		if !ok {
+			h := make(map[reData]int)
+			for _, rexp := range rexps {
+				if rexp.re.MatchString(text) {
+					h[rexp] = 1
+					fmt.Printf("%v: %s first match\n", tm, rexp.str)
+				} else {
+					h[rexp] = 0
+				}
+			}
+			data[tm] = hnData{
+				nHN:  1,
+				hits: h,
+			}
+		} else {
+			d.nHN++
+			for _, rexp := range rexps {
+				if rexp.re.MatchString(text) {
+					d.hits[rexp]++
+					fmt.Printf("%v: %s #%d match (all posts: %d)\n", tm, rexp.str, d.hits[rexp], d.nHN)
+				}
+			}
+			data[tm] = d
+		}
 	}
-	fmt.Printf("%d rows\n", row)
+	fmt.Printf("data: %+v\n%d rows\n", data, row)
 	return nil
 }
 
