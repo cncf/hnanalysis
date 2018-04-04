@@ -13,35 +13,52 @@ import (
 	lib "hnanalysis"
 )
 
+// reData holds regexp and its string "name"
 type reData struct {
 	re  *regexp.Regexp
 	str string
 }
 
+// hnData holds number of hacker news posts and
+// maps of reData hits
+// there can be up to nHN hits for each reData regexp
 type hnData struct {
 	nHN  int
 	hits map[reData]int
 }
 
-func processCSV(fn string) error {
+// processCSV Read "ifn" CSV file (BigQuery output)
+// analyses ita nd saves results to "ofn"
+func processCSV(ifn, ofn string) error {
+	// if called with DEBUG=1 some extra info will be displayed
 	debug := os.Getenv("DEBUG") != ""
-	file, err := os.Open(fn)
+
+	// Read CSV and close file
+	iFile, err := os.Open(ifn)
 	if err != nil {
 		return err
 	}
-	defer func() { _ = file.Close() }()
-	reader := csv.NewReader(file)
+	defer func() { _ = iFile.Close() }()
+	reader := csv.NewReader(iFile)
 	//reader.Comma = ';'
+
+	// Process CSV data
 	rows := 0
 	timeIndex := -1
 	textIndex := -1
+
+	// Main data structure
 	data := make(map[time.Time]hnData)
+
+	// RegExps to check
 	var rexps []reData
 	rexps = append(rexps, reData{str: "Kubernetes", re: regexp.MustCompile(`(?im)[\W](kubernetes|k8s)[\W]`)})
 	rexps = append(rexps, reData{str: "Mesos", re: regexp.MustCompile(`(?im)[\W]mesos[\W]`)})
 	rexps = append(rexps, reData{str: "Cloud Foundry", re: regexp.MustCompile(`(?im)[\W]cloud\s+foundry[\W]`)})
 	rexps = append(rexps, reData{str: "Docker Swarm", re: regexp.MustCompile(`(?im)[\W]docker\s+swarm[\W]`)})
 	rexps = append(rexps, reData{str: "OpenStack", re: regexp.MustCompile(`(?im)[\W]openstack[\W]`)})
+
+	// Months
 	tms := make(map[time.Time]struct{})
 	for {
 		record, err := reader.Read()
@@ -51,6 +68,7 @@ func processCSV(fn string) error {
 			return err
 		}
 		rows++
+		// Get indexes of data rows we need
 		if rows == 1 {
 			for k, v := range record {
 				switch v {
@@ -62,13 +80,19 @@ func processCSV(fn string) error {
 			}
 			continue
 		}
+
+		// time is stored as unix seconds since epoch
 		utm, err := strconv.ParseInt(record[timeIndex], 10, 64)
 		if err != nil {
 			return err
 		}
+
+		// Group by months
 		tm := lib.MonthStart(time.Unix(utm, 0))
 		tms[tm] = struct{}{}
 		text := record[textIndex]
+
+		// Analyse post text for given regexps
 		d, ok := data[tm]
 		if !ok {
 			h := make(map[reData]int)
@@ -99,6 +123,8 @@ func processCSV(fn string) error {
 			data[tm] = d
 		}
 	}
+
+	// Sort all months found
 	tmAry := lib.TimeAry{}
 	for tm := range tms {
 		tmAry = append(tmAry, tm)
@@ -108,28 +134,55 @@ func processCSV(fn string) error {
 		fmt.Printf("data: %+v\n", data)
 		fmt.Printf("dates: %+v\n", tmAry)
 	}
+
+	// Write output CSV
+	oFile, err := os.Create(ofn)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = oFile.Close() }()
+	writer := csv.NewWriter(oFile)
+	defer writer.Flush()
+
+	// Header row "Month", "Hacker News Total" + all regexps processed
+	hdr := []string{"Month", "Hacker News Total"}
+	for _, rexp := range rexps {
+		hdr = append(hdr, rexp.str)
+	}
+	err = writer.Write(hdr)
+	if err != nil {
+		return err
+	}
+
+	// Data rows
 	for _, tm := range tmAry {
 		d, ok := data[tm]
 		if !ok {
 			fmt.Printf("WARNING: Missing data for %v\n", tm)
+			continue
 		}
-		s := fmt.Sprintf("Month: %v, HN: %d, ", lib.ToYMDDate(tm), d.nHN)
+		row := []string{lib.ToYMDDate(tm), strconv.Itoa(d.nHN)}
 		for _, rexp := range rexps {
-			s += fmt.Sprintf("%s: %d, ", rexp.str, d.hits[rexp])
+			row = append(row, strconv.Itoa(d.hits[rexp]))
 		}
-		fmt.Printf("%s\n", s)
+		err = writer.Write(row)
+		if err != nil {
+			return err
+		}
 	}
+
+	// All OK, return
 	fmt.Printf("Processed %d rows\n", rows)
 	return nil
 }
 
 func main() {
 	dtStart := time.Now()
-	if len(os.Args) < 2 {
-		fmt.Printf("%s: required CSV file name (BigQuery output)\n", os.Args[0])
+	if len(os.Args) < 3 {
+		fmt.Printf("%s: required input CSV file name (BigQuery output) and output CSV file name\n", os.Args[0])
 		return
 	}
-	err := processCSV(os.Args[1])
+	err := processCSV(os.Args[1], os.Args[2])
 	if err != nil {
 		fmt.Printf("Error: %s\n", err)
 	}
