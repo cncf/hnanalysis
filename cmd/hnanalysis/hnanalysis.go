@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"regexp"
+	"sort"
 	"strconv"
 	"time"
 
@@ -23,6 +24,7 @@ type hnData struct {
 }
 
 func processCSV(fn string) error {
+	debug := os.Getenv("DEBUG") != ""
 	file, err := os.Open(fn)
 	if err != nil {
 		return err
@@ -30,16 +32,17 @@ func processCSV(fn string) error {
 	defer func() { _ = file.Close() }()
 	reader := csv.NewReader(file)
 	//reader.Comma = ';'
-	row := 0
+	rows := 0
 	timeIndex := -1
 	textIndex := -1
 	data := make(map[time.Time]hnData)
 	var rexps []reData
-	rexps = append(rexps, reData{str: "Kubernetes", re: regexp.MustCompile(`(?im)(kubernetes|k8s)`)})
-	rexps = append(rexps, reData{str: "Mesos", re: regexp.MustCompile(`(?im)mesos`)})
-	rexps = append(rexps, reData{str: "Cloud Foundry", re: regexp.MustCompile(`(?im)cloud\s+foundry`)})
-	rexps = append(rexps, reData{str: "Docker Swarm", re: regexp.MustCompile(`(?im)docker\s+swarm`)})
-	rexps = append(rexps, reData{str: "OpenStack", re: regexp.MustCompile(`(?im)openstack`)})
+	rexps = append(rexps, reData{str: "Kubernetes", re: regexp.MustCompile(`(?im)[\W](kubernetes|k8s)[\W]`)})
+	rexps = append(rexps, reData{str: "Mesos", re: regexp.MustCompile(`(?im)[\W]mesos[\W]`)})
+	rexps = append(rexps, reData{str: "Cloud Foundry", re: regexp.MustCompile(`(?im)[\W]cloud\s+foundry[\W]`)})
+	rexps = append(rexps, reData{str: "Docker Swarm", re: regexp.MustCompile(`(?im)[\W]docker\s+swarm[\W]`)})
+	rexps = append(rexps, reData{str: "OpenStack", re: regexp.MustCompile(`(?im)[\W]openstack[\W]`)})
+	tms := make(map[time.Time]struct{})
 	for {
 		record, err := reader.Read()
 		if err == io.EOF {
@@ -47,8 +50,8 @@ func processCSV(fn string) error {
 		} else if err != nil {
 			return err
 		}
-		row++
-		if row == 1 {
+		rows++
+		if rows == 1 {
 			for k, v := range record {
 				switch v {
 				case "time":
@@ -64,6 +67,7 @@ func processCSV(fn string) error {
 			return err
 		}
 		tm := lib.MonthStart(time.Unix(utm, 0))
+		tms[tm] = struct{}{}
 		text := record[textIndex]
 		d, ok := data[tm]
 		if !ok {
@@ -71,7 +75,9 @@ func processCSV(fn string) error {
 			for _, rexp := range rexps {
 				if rexp.re.MatchString(text) {
 					h[rexp] = 1
-					fmt.Printf("%v: %s first match\n", tm, rexp.str)
+					if debug {
+						fmt.Printf("%v: %s first match\n", tm, rexp.str)
+					}
 				} else {
 					h[rexp] = 0
 				}
@@ -85,13 +91,35 @@ func processCSV(fn string) error {
 			for _, rexp := range rexps {
 				if rexp.re.MatchString(text) {
 					d.hits[rexp]++
-					fmt.Printf("%v: %s #%d match (all posts: %d)\n", tm, rexp.str, d.hits[rexp], d.nHN)
+					if debug {
+						fmt.Printf("%v: %s #%d match (all posts: %d)\n", tm, rexp.str, d.hits[rexp], d.nHN)
+					}
 				}
 			}
 			data[tm] = d
 		}
 	}
-	fmt.Printf("data: %+v\n%d rows\n", data, row)
+	tmAry := lib.TimeAry{}
+	for tm := range tms {
+		tmAry = append(tmAry, tm)
+	}
+	sort.Sort(tmAry)
+	if debug {
+		fmt.Printf("data: %+v\n", data)
+		fmt.Printf("dates: %+v\n", tmAry)
+	}
+	for _, tm := range tmAry {
+		d, ok := data[tm]
+		if !ok {
+			fmt.Printf("WARNING: Missing data for %v\n", tm)
+		}
+		s := fmt.Sprintf("Month: %v, HN: %d, ", lib.ToYMDDate(tm), d.nHN)
+		for _, rexp := range rexps {
+			s += fmt.Sprintf("%s: %d, ", rexp.str, d.hits[rexp])
+		}
+		fmt.Printf("%s\n", s)
+	}
+	fmt.Printf("Processed %d rows\n", rows)
 	return nil
 }
 
