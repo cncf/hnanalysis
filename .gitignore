@@ -18,3 +18,5 @@
 
 # VIM temps
 *.swp
+
+/out
