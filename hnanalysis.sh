@@ -1,2 +1,2 @@
 #!/bin/sh
-make && ./hnanalysis data/hn_from_2016.csv results/result.csv
+make && ./hnanalysis data/hn.csv results/result.csv

@@ -77,7 +77,6 @@ func processCSV(ifn, ofn string) error {
 		allJobs.Jobs[i].re = regexp.MustCompile(job.ReStr)
 	}
 	rexps := allJobs.Jobs
-	fmt.Printf("%v\n", rexps)
 
 	// Months
 	tms := make(map[time.Time]struct{})
