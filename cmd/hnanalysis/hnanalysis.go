@@ -4,6 +4,7 @@ import (
 	"encoding/csv"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"regexp"
 	"sort"
@@ -11,12 +12,22 @@ import (
 	"time"
 
 	lib "hnanalysis"
+
+	yaml "gopkg.in/yaml.v2"
 )
 
 // reData holds regexp and its string "name"
+// It is read from "jobs.yaml" file
 type reData struct {
-	re  *regexp.Regexp
-	str string
+	re    *regexp.Regexp `yaml:""`
+	Str   string         `yaml:"name"`
+	ReStr string         `yaml:"regexp"`
+}
+
+// jobs keep all jobs to process
+// It is read from "jobs.yaml" file
+type jobs struct {
+	Jobs []reData `yaml:"jobs"`
 }
 
 // hnData holds number of hacker news posts and
@@ -50,13 +61,23 @@ func processCSV(ifn, ofn string) error {
 	// Main data structure
 	data := make(map[time.Time]hnData)
 
-	// RegExps to check
-	var rexps []reData
-	rexps = append(rexps, reData{str: "Kubernetes", re: regexp.MustCompile(`(?im)[\W](kubernetes|k8s)[\W]`)})
-	rexps = append(rexps, reData{str: "Mesos", re: regexp.MustCompile(`(?im)[\W]mesos[\W]`)})
-	rexps = append(rexps, reData{str: "Cloud Foundry", re: regexp.MustCompile(`(?im)[\W]cloud\s+foundry[\W]`)})
-	rexps = append(rexps, reData{str: "Docker Swarm", re: regexp.MustCompile(`(?im)[\W]docker\s+swarm[\W]`)})
-	rexps = append(rexps, reData{str: "OpenStack", re: regexp.MustCompile(`(?im)[\W]openstack[\W]`)})
+	// Read defined jobs
+	bytes, err := ioutil.ReadFile("jobs.yaml")
+	if err != nil {
+		return err
+	}
+
+	// Parse YAML
+	var allJobs jobs
+	err = yaml.Unmarshal(bytes, &allJobs)
+	if err != nil {
+		return err
+	}
+	for i, job := range allJobs.Jobs {
+		allJobs.Jobs[i].re = regexp.MustCompile(job.ReStr)
+	}
+	rexps := allJobs.Jobs
+	fmt.Printf("%v\n", rexps)
 
 	// Months
 	tms := make(map[time.Time]struct{})
@@ -100,7 +121,7 @@ func processCSV(ifn, ofn string) error {
 				if rexp.re.MatchString(text) {
 					h[rexp] = 1
 					if debug {
-						fmt.Printf("%v: %s first match\n", tm, rexp.str)
+						fmt.Printf("%v: %s first match\n", tm, rexp.Str)
 					}
 				} else {
 					h[rexp] = 0
@@ -116,7 +137,7 @@ func processCSV(ifn, ofn string) error {
 				if rexp.re.MatchString(text) {
 					d.hits[rexp]++
 					if debug {
-						fmt.Printf("%v: %s #%d match (all posts: %d)\n", tm, rexp.str, d.hits[rexp], d.nHN)
+						fmt.Printf("%v: %s #%d match (all posts: %d)\n", tm, rexp.Str, d.hits[rexp], d.nHN)
 					}
 				}
 			}
@@ -147,7 +168,7 @@ func processCSV(ifn, ofn string) error {
 	// Header row "Month", "Hacker News Total" + all regexps processed
 	hdr := []string{"Month", "Hacker News Total"}
 	for _, rexp := range rexps {
-		hdr = append(hdr, rexp.str)
+		hdr = append(hdr, rexp.Str)
 	}
 	err = writer.Write(hdr)
 	if err != nil {
