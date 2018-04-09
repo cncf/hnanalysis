@@ -1,12 +1,12 @@
 ---
 jobs:
   - name: Kubernetes
-    regexp: '(?im)[\W](kubernetes|k8s)[\W]'
+    regexp: '(?im)\W(kubernetes|k8s)\W'
   - name: Mesos
-    regexp: '(?im)[\W]mesos[\W]'
+    regexp: '(?im)\Wmesos\W'
   - name: Cloud Foundry
-    regexp: '(?im)[\W]cloud\s+foundry[\W]'
+    regexp: '(?im)\Wcloud\s+foundry\W'
   - name: Docker Swarm
-    regexp: '(?im)[\W]docker\s+swarm[\W]'
+    regexp: '(?im)\Wdocker\s+swarm\W'
   - name: OpenStack
-    regexp: '(?im)[\W]openstack[\W]'
+    regexp: '(?im)\Wopenstack\W'
