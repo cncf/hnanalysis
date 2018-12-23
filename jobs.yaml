@@ -9,4 +9,6 @@ jobs:
   - name: Docker Swarm
     regexp: '(?im)\Wdocker\s+swarm\W'
   - name: OpenStack
-    regexp: '(?im)\Wopenstack\W'
+    regexp: '(?im)\Wopen\s*stack\W'
+  - name: Prometheus
+    regexp: '(?im)\Wprometheus\W'
