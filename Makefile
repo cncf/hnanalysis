@@ -2,7 +2,7 @@ GO_LIB_FILES=lib.go
 GO_BIN_FILES=cmd/hnanalysis/hnanalysis.go
 GO_TEST_FILES=lib_test.go
 GO_LIBTEST_FILES=test/time.go
-GO_BIN_CMDS=hnanalysis/cmd/hnanalysis
+GO_BIN_CMDS=github.com/cncf/hnanalysis/cmd/hnanalysis
 GO_ENV=CGO_ENABLED=0
 GO_BUILD=go build -ldflags '-s -w'
 GO_INSTALL=go install -ldflags '-s'

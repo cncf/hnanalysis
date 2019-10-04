@@ -1,10 +1,11 @@
 package hnanalysis
 
 import (
-	lib "hnanalysis"
-	testlib "hnanalysis/test"
 	"testing"
 	"time"
+
+	lib "github.com/cncf/hnanalysis"
+	testlib "github.com/cncf/hnanalysis/test"
 )
 
 func TestMonthStart(t *testing.T) {

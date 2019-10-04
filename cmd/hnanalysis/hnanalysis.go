@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/csv"
 	"fmt"
-	lib "hnanalysis"
 	"io"
 	"io/ioutil"
 	"os"
@@ -12,6 +11,7 @@ import (
 	"strconv"
 	"time"
 
+	lib "github.com/cncf/hnanalysis"
 	yaml "gopkg.in/yaml.v2"
 )
 
