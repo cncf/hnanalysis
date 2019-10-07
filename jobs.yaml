@@ -12,3 +12,5 @@ jobs:
     regexp: '(?im)\Wopen\s*stack\W'
   - name: Prometheus
     regexp: '(?im)\Wprometheus\W'
+  - name: Lambda
+    regexp: '(?im)\Wlambda\W'
